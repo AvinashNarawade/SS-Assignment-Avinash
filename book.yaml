@@ -1,0 +1,54 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-service
+  template:
+    metadata:
+      labels:
+        app: book-service
+    spec:
+      initContainers:
+        - name: initialize-book-db
+          image: library-book-service:v1
+          imagePullPolicy: Never
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /data/books.db ]; then
+                cp /seed/books.db /data/books.db
+              fi
+          volumeMounts:
+            - name: book-storage
+              mountPath: /data
+      containers:
+        - name: book-service
+          image: library-book-service:v1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5001
+          volumeMounts:
+            - name: book-storage
+              mountPath: /data
+      volumes:
+        - name: book-storage
+          persistentVolumeClaim:
+            claimName: book-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-service
+spec:
+  type: ClusterIP
+  selector:
+    app: book-service
+  ports:
+    - port: 5001
+      targetPort: 5001

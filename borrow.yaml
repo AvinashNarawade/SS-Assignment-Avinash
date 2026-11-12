@@ -1,0 +1,57 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: borrow-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: borrow-service
+  template:
+    metadata:
+      labels:
+        app: borrow-service
+    spec:
+      initContainers:
+        - name: initialize-borrow-db
+          image: library-borrow-service:v1
+          imagePullPolicy: Never
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /data/borrow.db ]; then
+                cp /seed/borrow.db /data/borrow.db
+              fi
+          volumeMounts:
+            - name: borrow-storage
+              mountPath: /data
+      containers:
+        - name: borrow-service
+          image: library-borrow-service:v1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5002
+          env:
+            - name: BOOK_SERVICE_URL
+              value: "http://book-service:5001"
+          volumeMounts:
+            - name: borrow-storage
+              mountPath: /data
+      volumes:
+        - name: borrow-storage
+          persistentVolumeClaim:
+            claimName: borrow-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: borrow-service
+spec:
+  type: ClusterIP
+  selector:
+    app: borrow-service
+  ports:
+    - port: 5002
+      targetPort: 5002
